@@ -168,3 +168,7 @@ Network Trash Folder
 Temporary Items
 .apdisk
 
+.idea/
+code/wireroute
+code/wireroute_debug
+
