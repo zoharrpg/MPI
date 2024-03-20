@@ -278,6 +278,7 @@ void random_bend(Wire &wire) {
 void across_wires(std::vector <Wire> &wires, std::vector <std::vector<int>> &occupancy, const int iterations,
                   const int batch_size, int nproc, int pid) {
     auto num_wires = static_cast<int>(std::size(wires));
+    MPI_Status status;
     for (int iter = 0; iter < iterations; iter++) {
         for (int start = 0; start < num_wires; start += batch_size) {
             int end = std::min(start + batch_size, num_wires);
@@ -285,7 +286,10 @@ void across_wires(std::vector <Wire> &wires, std::vector <std::vector<int>> &occ
             for (int i = start; i < end; i++) {
                 update_wire<false, true>(wires[i], occupancy, -1);
             }
-            for (int wire_index = start + pid; wire_index < end; wire_index += nproc) {
+            int span = (end - start + nproc - 1) / nproc;
+            int span_start = start + pid * span;
+            int span_end = std::min(span_start + span, end);
+            for (int wire_index = span_start; wire_index < span_end; wire_index++) {
                 if (random_happen()) {
                     random_bend(wires[wire_index]);
                     update_wire<true, true>(wires[wire_index], occupancy, 1);
@@ -309,6 +313,23 @@ void across_wires(std::vector <Wire> &wires, std::vector <std::vector<int>> &occ
                     }
                 }
             }
+            if (pid != 0) {
+                MPI_Send(&wires[span_start], (span_end - span_start) * sizeof(Wire), MPI_BYTE, 0, 0, MPI_COMM_WORLD);
+            } else {
+                for (int source = 1; source < nproc; source++) {
+                    int source_start = start + source * span;
+                    int source_end = std::min(source_start + span, end);
+                    MPI_Recv(&wires[source_start], (source_end - source_start) * sizeof(Wire), MPI_BYTE, source, 0, MPI_COMM_WORLD,
+                             &status);
+                }
+            }
+            MPI_Bcast(&wires[start], (end - start) * sizeof(Wire), MPI_BYTE, 0, MPI_COMM_WORLD);
+
+//            if (pid == 0) {
+//                MPI_Send(&wires[start], (end - start) * sizeof(Wire), MPI_BYTE, 0, 0, MPI_COMM_WORLD);
+//            } else {
+//                MPI_Recv(&wires[start], (end - start) * sizeof(Wire), MPI_BYTE, 0, 0, MPI_COMM_WORLD, &status);
+//            }
 
             for (int wire_index = start; wire_index < end; wire_index++) {
                 update_wire<false, true>(wires[wire_index], occupancy, 1);
