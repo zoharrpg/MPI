@@ -238,11 +238,13 @@ cost_t update_wire(const Wire &wire, std::vector <std::vector<int>> &occupancy, 
 }
 
 cost_t initialize(const std::vector <Wire> &wires, std::vector <std::vector<int>> &occupancy) {
+    std::cout << "wires size: " << std::size(wires) << '\n';
+    cost_t total_cost = 0;
     /* Initialize occupancy matrix */
     for (unsigned int i = 0; i < std::size(wires); i++) {
-        update_wire<false, true>(wires[i], occupancy, 1);
+        total_cost += update_wire<true, true>(wires[i], occupancy, 1);
     }
-    return 0;
+    return total_cost;
 }
 
 template<bool CalculateDeltaCost>
@@ -362,20 +364,23 @@ int main(int argc, char *argv[]) {
         for (auto &wire: wires) {
             fin >> wire.start_x >> wire.start_y >> wire.end_x >> wire.end_y;
             wire.bend1_x = wire.start_x;
-            wire.bend1_y = wire.start_y;
+            wire.bend1_y = wire.end_y;
         }
     }
 
-    std::sort(wires.begin(), wires.end(), [](const Wire &a, const Wire &b) {
-        int distance_a = std::abs(a.start_x - a.end_x) + std::abs(a.start_y - a.end_y);
-        int distance_b = std::abs(b.start_x - b.end_x) + std::abs(b.start_y - b.end_y);
-        return distance_a > distance_b; // Descending order
-    });
-
-    initialize(wires, occupancy);
-
     /* Initialize any additional data structures needed in the algorithm */
-    fixed_probability(SA_prob);
+    if (pid == 0) {
+        std::sort(wires.begin(), wires.end(), [](const Wire &a, const Wire &b) {
+            int distance_a = std::abs(a.start_x - a.end_x) + std::abs(a.start_y - a.end_y);
+            int distance_b = std::abs(b.start_x - b.end_x) + std::abs(b.start_y - b.end_y);
+            return distance_a > distance_b; // Descending order
+        });
+        occupancy.resize(dim_y, std::vector<int>(dim_x));
+        cost_t initial_cost = initialize(wires, occupancy);
+        std::cout << "Initial cost: " << initial_cost << '\n';
+
+        fixed_probability(SA_prob);
+    }
 
     if (pid == 0) {
         const double init_time = std::chrono::duration_cast < std::chrono::duration <
