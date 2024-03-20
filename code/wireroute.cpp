@@ -325,12 +325,6 @@ void across_wires(std::vector <Wire> &wires, std::vector <std::vector<int>> &occ
             }
             MPI_Bcast(&wires[start], (end - start) * sizeof(Wire), MPI_BYTE, 0, MPI_COMM_WORLD);
 
-//            if (pid == 0) {
-//                MPI_Send(&wires[start], (end - start) * sizeof(Wire), MPI_BYTE, 0, 0, MPI_COMM_WORLD);
-//            } else {
-//                MPI_Recv(&wires[start], (end - start) * sizeof(Wire), MPI_BYTE, 0, 0, MPI_COMM_WORLD, &status);
-//            }
-
             for (int wire_index = start; wire_index < end; wire_index++) {
                 update_wire<false, true>(wires[wire_index], occupancy, 1);
             }
