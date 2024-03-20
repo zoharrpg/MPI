@@ -238,13 +238,11 @@ cost_t update_wire(const Wire &wire, std::vector <std::vector<int>> &occupancy, 
 }
 
 cost_t initialize(const std::vector <Wire> &wires, std::vector <std::vector<int>> &occupancy) {
-    std::cout << "wires size: " << std::size(wires) << '\n';
-    cost_t total_cost = 0;
     /* Initialize occupancy matrix */
     for (unsigned int i = 0; i < std::size(wires); i++) {
-        total_cost += update_wire<true, true>(wires[i], occupancy, 1);
+        update_wire<false, true>(wires[i], occupancy, 1);
     }
-    return total_cost;
+    return 0;
 }
 
 template<bool CalculateDeltaCost>
@@ -376,8 +374,7 @@ int main(int argc, char *argv[]) {
             return distance_a > distance_b; // Descending order
         });
         occupancy.resize(dim_y, std::vector<int>(dim_x));
-        cost_t initial_cost = initialize(wires, occupancy);
-        std::cout << "Initial cost: " << initial_cost << '\n';
+        initialize(wires, occupancy);
 
         fixed_probability(SA_prob);
     }
