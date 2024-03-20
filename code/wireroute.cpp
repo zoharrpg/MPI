@@ -277,6 +277,44 @@ void random_bend(Wire &wire) {
 
 void across_wires(std::vector <Wire> &wires, std::vector <std::vector<int>> &occupancy, const int iterations,
                   const int batch_size, int nproc, int pid) {
+    auto num_wires = static_cast<int>(std::size(wires));
+    for (int iter = 0; iter < iterations; iter++) {
+        for (int start = 0; start < num_wires; start += batch_size) {
+            int end = std::min(start + batch_size, num_wires);
+            // Remove all wires in the batch from the occupancy matrix
+            for (int i = start; i < end; i++) {
+                update_wire<false, true>(wires[i], occupancy, -1);
+            }
+            for (int wire_index = start + pid; wire_index < end; wire_index += nproc) {
+                if (random_happen()) {
+                    random_bend(wires[wire_index]);
+                    update_wire<true, true>(wires[wire_index], occupancy, 1);
+                    continue;
+                }
+                cost_t delta_cost = std::numeric_limits<cost_t>::max();
+                Wire wire = wires[wire_index];
+                // If the wire is horizontal or vertical, skip
+                if (num_bends(wire) == 0) {
+                    continue;
+                }
+
+                int delta_x = std::abs(wire.start_x - wire.end_x);
+                int delta_y = std::abs(wire.start_y - wire.end_y);
+                for (int i = 1; i <= delta_x + delta_y; i++) {
+                    cost_t _delta_cost = set_bend<true>(i, &occupancy, wire);
+                    if (_delta_cost < delta_cost) {
+                        delta_cost = _delta_cost;
+                        wires[wire_index].bend1_x = wire.bend1_x;
+                        wires[wire_index].bend1_y = wire.bend1_y;
+                    }
+                }
+            }
+
+            for (int wire_index = start; wire_index < end; wire_index++) {
+                update_wire<false, true>(wires[wire_index], occupancy, 1);
+            }
+        }
+    }
 }
 
 int main(int argc, char *argv[]) {
