@@ -61,4 +61,5 @@ struct wr_checker {
     void validate() const;
 };
 
+using cost_t = int;
 #endif

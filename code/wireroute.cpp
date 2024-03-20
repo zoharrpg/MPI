@@ -6,6 +6,7 @@
 #include <chrono>
 #include <string>
 #include <vector>
+#include <random>
 
 #include <mpi.h>
 
@@ -83,6 +84,195 @@ void write_output(const std::vector <Wire> &wires, const int num_wires, const st
     }
 
     out_wires.close();
+}
+
+
+double fixed_probability(const double prob = -1) {
+    static double fixed_prob = -1;
+    if (prob > 0) {
+        fixed_prob = prob;
+    }
+    return fixed_prob;
+}
+
+bool random_happen() {
+    static thread_local std::mt19937
+    generator(std::random_device{}());
+    std::uniform_real_distribution<double> distribution(0.0, 1.0);
+
+    static const double probability = fixed_probability();
+    return distribution(generator) < probability;
+}
+
+int num_bends(const Wire &wire) {
+    /* Returns the number of bends in the wire */
+    return (wire.start_x != wire.bend1_x) + (wire.bend1_x != wire.end_x) + (wire.start_y != wire.bend1_y) +
+           (wire.bend1_y != wire.end_y) - 1;
+}
+
+template<bool CalculateDeltaCost, bool UpdateOccupancy>
+cost_t update_point(const int x, const int y, std::vector <std::vector<int>> &occupancy, const int delta) {
+    /* Update the occupancy count of a point (x, y) */
+    cost_t delta_cost = 0;
+    if constexpr(CalculateDeltaCost)
+    {
+        delta_cost = (occupancy[y][x] + delta) * (occupancy[y][x] + delta) - occupancy[y][x] * occupancy[y][x];
+    }
+    if constexpr(UpdateOccupancy)
+    {
+        occupancy[y][x] += delta;
+    }
+    return delta_cost;
+}
+
+template<bool CalculateDeltaCost, bool UpdateOccupancy>
+cost_t update_wire_no_bend(const Wire &wire, std::vector <std::vector<int>> &occupancy, const int delta) {
+    cost_t delta_cost = 0;
+    if (wire.start_x == wire.end_x) {
+        // Vertical wire
+        for (int y = std::min(wire.start_y, wire.end_y); y <= std::max(wire.start_y, wire.end_y); y++) {
+            delta_cost += update_point<CalculateDeltaCost, UpdateOccupancy>(wire.start_x, y, occupancy, delta);
+        }
+    } else {
+        // Horizontal wire
+        for (int x = std::min(wire.start_x, wire.end_x); x <= std::max(wire.start_x, wire.end_x); x++) {
+            delta_cost += update_point<CalculateDeltaCost, UpdateOccupancy>(x, wire.start_y, occupancy, delta);
+        }
+    }
+    return delta_cost;
+}
+
+template<bool CalculateDeltaCost, bool UpdateOccupancy>
+cost_t update_wire_one_bend(const Wire &wire, std::vector <std::vector<int>> &occupancy, const int delta) {
+    cost_t delta_cost = 0;
+    if (wire.start_x == wire.bend1_x) {
+        // Vertical first bend
+        int direction = wire.start_y < wire.bend1_y ? 1 : -1;
+        for (int y = wire.start_y; y != wire.bend1_y; y += direction) {
+            delta_cost += update_point<CalculateDeltaCost, UpdateOccupancy>(wire.start_x, y, occupancy, delta);
+        }
+
+        // Horizontal second bend
+        for (int x = std::min(wire.bend1_x, wire.end_x); x <= std::max(wire.bend1_x, wire.end_x); x++) {
+            delta_cost += update_point<CalculateDeltaCost, UpdateOccupancy>(x, wire.bend1_y, occupancy, delta);
+        }
+    } else {
+        // Horizontal first bend
+        int direction = wire.start_x < wire.bend1_x ? 1 : -1;
+        for (int x = wire.start_x; x != wire.bend1_x; x += direction) {
+            delta_cost += update_point<CalculateDeltaCost, UpdateOccupancy>(x, wire.start_y, occupancy, delta);
+        }
+
+        // Vertical second bend
+        for (int y = std::min(wire.bend1_y, wire.end_y); y <= std::max(wire.bend1_y, wire.end_y); y++) {
+            delta_cost += update_point<CalculateDeltaCost, UpdateOccupancy>(wire.bend1_x, y, occupancy, delta);
+        }
+    }
+
+    return delta_cost;
+}
+
+template<bool CalculateDeltaCost, bool UpdateOccupancy>
+cost_t update_wire_two_bends(const Wire &wire, std::vector <std::vector<int>> &occupancy, const int delta) {
+    cost_t delta_cost = 0;
+    if (wire.start_x == wire.bend1_x) {
+        // Vertical first bend
+        int direction = wire.start_y < wire.bend1_y ? 1 : -1;
+        for (int y = wire.start_y; y != wire.bend1_y; y += direction) {
+            delta_cost += update_point<CalculateDeltaCost, UpdateOccupancy>(wire.start_x, y, occupancy, delta);
+        }
+
+        // Horizontal second bend
+        direction = wire.bend1_x < wire.end_x ? 1 : -1;
+        for (int x = wire.bend1_x; x != wire.end_x; x += direction) {
+            delta_cost += update_point<CalculateDeltaCost, UpdateOccupancy>(x, wire.bend1_y, occupancy, delta);
+        }
+
+        // Vertical third
+        for (int y = std::min(wire.bend1_y, wire.end_y); y <= std::max(wire.bend1_y, wire.end_y); y++) {
+            delta_cost += update_point<CalculateDeltaCost, UpdateOccupancy>(wire.end_x, y, occupancy, delta);
+        }
+    } else {
+        // Horizontal first bend
+        int direction = wire.start_x < wire.bend1_x ? 1 : -1;
+        for (int x = wire.start_x; x != wire.bend1_x; x += direction) {
+            delta_cost += update_point<CalculateDeltaCost, UpdateOccupancy>(x, wire.start_y, occupancy, delta);
+        }
+
+        // Vertical second bend
+        direction = wire.bend1_y < wire.end_y ? 1 : -1;
+        for (int y = wire.bend1_y; y != wire.end_y; y += direction) {
+            delta_cost += update_point<CalculateDeltaCost, UpdateOccupancy>(wire.bend1_x, y, occupancy, delta);
+        }
+
+        // Horizontal second
+        for (int x = std::min(wire.bend1_x, wire.end_x); x <= std::max(wire.bend1_x, wire.end_x); x++) {
+            delta_cost += update_point<CalculateDeltaCost, UpdateOccupancy>(x, wire.end_y, occupancy, delta);
+        }
+    }
+
+    return delta_cost;
+}
+
+template<bool CalculateDeltaCost, bool UpdateOccupancy>
+cost_t update_wire(const Wire &wire, std::vector <std::vector<int>> &occupancy, const int delta) {
+    cost_t delta_cost = 0;
+    switch (int num_bend = num_bends(wire)) {
+        case 0:
+            // No bends
+            delta_cost = update_wire_no_bend<CalculateDeltaCost, UpdateOccupancy>(wire, occupancy, delta);
+            break;
+        case 1:
+            // One bend
+            delta_cost = update_wire_one_bend<CalculateDeltaCost, UpdateOccupancy>(wire, occupancy, delta);
+            break;
+        case 2:
+            // Two bends
+            delta_cost = update_wire_two_bends<CalculateDeltaCost, UpdateOccupancy>(wire, occupancy, delta);
+            break;
+        default:
+            std::cerr << "Invalid number of bends: " << num_bend << '\n';
+            exit(EXIT_FAILURE);
+    }
+    return delta_cost;
+}
+
+cost_t initialize(const std::vector <Wire> &wires, std::vector <std::vector<int>> &occupancy) {
+    /* Initialize occupancy matrix */
+    for (unsigned int i = 0; i < std::size(wires); i++) {
+        update_wire<false, true>(wires[i], occupancy, 1);
+    }
+    return 0;
+}
+
+template<bool CalculateDeltaCost>
+cost_t set_bend(int index, std::vector <std::vector<int>> *occupancy, Wire &wire) {
+    int delta_x = std::abs(wire.start_x - wire.end_x);
+    cost_t delta_cost = 0;
+    if (index <= delta_x) {
+        wire.bend1_x = wire.start_x + (wire.start_x < wire.end_x ? index : -index);
+        wire.bend1_y = wire.start_y;
+    } else {
+        index -= delta_x;
+        wire.bend1_x = wire.start_x;
+        wire.bend1_y = wire.start_y + (wire.start_y < wire.end_y ? index : -index);
+    }
+    if constexpr(CalculateDeltaCost)
+    {
+        delta_cost = update_wire<true, false>(wire, *occupancy, 1);
+    }
+
+    return delta_cost;
+}
+
+void random_bend(Wire &wire) {
+    int delta_x = std::abs(wire.end_x - wire.start_x);
+    int delta_y = std::abs(wire.end_y - wire.start_y);
+    std::random_device rd;
+    std::mt19937 gen(rd());
+    std::uniform_int_distribution<int> dis_x(1, delta_x + delta_y);
+
+    set_bend<false>(dis_x(gen), nullptr, wire);
 }
 
 int main(int argc, char *argv[]) {
@@ -176,7 +366,16 @@ int main(int argc, char *argv[]) {
         }
     }
 
+    std::sort(wires.begin(), wires.end(), [](const Wire &a, const Wire &b) {
+        int distance_a = std::abs(a.start_x - a.end_x) + std::abs(a.start_y - a.end_y);
+        int distance_b = std::abs(b.start_x - b.end_x) + std::abs(b.start_y - b.end_y);
+        return distance_a > distance_b; // Descending order
+    });
+
+    initialize(wires, occupancy);
+
     /* Initialize any additional data structures needed in the algorithm */
+    fixed_probability(SA_prob);
 
     if (pid == 0) {
         const double init_time = std::chrono::duration_cast < std::chrono::duration <
