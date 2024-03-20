@@ -292,7 +292,6 @@ void across_wires(std::vector <Wire> &wires, std::vector <std::vector<int>> &occ
             for (int wire_index = span_start; wire_index < span_end; wire_index++) {
                 if (random_happen()) {
                     random_bend(wires[wire_index]);
-                    update_wire<true, true>(wires[wire_index], occupancy, 1);
                     continue;
                 }
                 cost_t delta_cost = std::numeric_limits<cost_t>::max();
