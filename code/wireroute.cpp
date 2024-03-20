@@ -321,7 +321,7 @@ void across_wires(std::vector <Wire> &wires, std::vector <std::vector<int>> &occ
                 for (int source = 1; source < nproc; source++) {
                     int source_start = start + source * span;
                     int source_end = std::min(source_start + span, end);
-                    if (source_start <= source_end) {
+                    if (source_start < source_end) {
                         MPI_Recv(&wires[source_start], (source_end - source_start) * sizeof(Wire), MPI_BYTE, source, 0, MPI_COMM_WORLD, &status);
                     }
                 }
