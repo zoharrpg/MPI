@@ -29,30 +29,36 @@
  to a validate_wire_t if you wish to use the checker.
 */
 struct validate_wire_t {
-  uint8_t num_pts;
-  struct {
-    uint16_t x;
-    uint16_t y;
-  } p[MAX_PTS_PER_WIRE];
-  validate_wire_t &cleanup(void);
-  void print_wire(void) const;
+    uint8_t num_pts;
+    struct {
+        uint16_t x;
+        uint16_t y;
+    } p[MAX_PTS_PER_WIRE];
+
+    validate_wire_t &cleanup(void);
+
+    void print_wire(void) const;
 };
 
 struct Wire {
-  /* Define the data structure for wire here. */ 
-  int start_x, start_y, end_x, end_y, bend1_x, bend1_y;
-  validate_wire_t to_validate_format(void) const;
+    /* Define the data structure for wire here. */
+    int start_x, start_y, end_x, end_y, bend1_x, bend1_y;
+
+    validate_wire_t to_validate_format(void) const;
 };
 
 struct wr_checker {
-  std::vector<Wire> wires;
-  std::vector<std::vector<int>> occupancies;
-  const int nwires;
-  const int dim_x;
-  const int dim_y;
-  wr_checker(std::vector<Wire> &wires, std::vector<std::vector<int>> &occupancies) 
-  : wires(wires), occupancies(occupancies), nwires(wires.size()), dim_x(occupancies[0].size()), dim_y(occupancies.size()) {}
-  void validate() const;
+    std::vector <Wire> wires;
+    std::vector <std::vector<int>> occupancies;
+    const int nwires;
+    const int dim_x;
+    const int dim_y;
+
+    wr_checker(std::vector <Wire> &wires, std::vector <std::vector<int>> &occupancies)
+            : wires(wires), occupancies(occupancies), nwires(wires.size()), dim_x(occupancies[0].size()),
+              dim_y(occupancies.size()) {}
+
+    void validate() const;
 };
 
 #endif
