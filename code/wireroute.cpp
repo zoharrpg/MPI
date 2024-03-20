@@ -275,6 +275,10 @@ void random_bend(Wire &wire) {
     set_bend<false>(dis_x(gen), nullptr, wire);
 }
 
+void across_wires(std::vector <Wire> &wires, std::vector <std::vector<int>> &occupancy, const int iterations,
+                  const int batch_size, int nproc, int pid) {
+}
+
 int main(int argc, char *argv[]) {
     const auto init_start = std::chrono::steady_clock::now();
     int pid;
@@ -347,6 +351,7 @@ int main(int argc, char *argv[]) {
     std::vector <Wire> wires;
     std::vector <std::vector<int>> occupancy;
 
+
     if (pid == 0) {
         std::ifstream fin(input_filename);
 
@@ -365,6 +370,14 @@ int main(int argc, char *argv[]) {
             wire.bend1_y = wire.end_y;
         }
     }
+    MPI_Bcast(&num_wires, 1, MPI_INT, 0, MPI_COMM_WORLD);
+    if (pid != 0) {
+        wires.resize(num_wires);
+    }
+
+    MPI_Bcast(&dim_x, 1, MPI_INT, 0, MPI_COMM_WORLD);
+    MPI_Bcast(&dim_y, 1, MPI_INT, 0, MPI_COMM_WORLD);
+    occupancy.resize(dim_y, std::vector<int>(dim_x));
 
     /* Initialize any additional data structures needed in the algorithm */
     if (pid == 0) {
@@ -373,11 +386,12 @@ int main(int argc, char *argv[]) {
             int distance_b = std::abs(b.start_x - b.end_x) + std::abs(b.start_y - b.end_y);
             return distance_a > distance_b; // Descending order
         });
-        occupancy.resize(dim_y, std::vector<int>(dim_x));
-        initialize(wires, occupancy);
-
-        fixed_probability(SA_prob);
     }
+
+    MPI_Bcast(wires.data(), num_wires * sizeof(Wire), MPI_BYTE, 0, MPI_COMM_WORLD);
+    initialize(wires, occupancy);
+
+    fixed_probability(SA_prob);
 
     if (pid == 0) {
         const double init_time = std::chrono::duration_cast < std::chrono::duration <
@@ -386,6 +400,14 @@ int main(int argc, char *argv[]) {
     }
 
     const auto compute_start = std::chrono::steady_clock::now();
+    switch (parallel_mode) {
+        case 'W':
+            throw std::runtime_error("Within wire mode not implemented");
+            break;
+        case 'A':
+            across_wires(wires, occupancy, SA_iters, batch_size, nproc, pid);
+            break;
+    }
 
 
     if (pid == 0) {
