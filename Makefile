@@ -1,16 +1,11 @@
-APP_NAME = wireroute
-OBJS = wireroute.o
+FILES= code/Makefile \
+	code/*.h \
+	code/*.cpp 
 
-CXX = mpic++
-CXXFLAGS = -Wall -Wextra -O3 -std=c++20 -I.
-
-default: $(APP_NAME)
-
-$(APP_NAME): $(OBJS)
-	$(CXX) $(CXXFLAGS) -o $@ $(OBJS)
-
-%.o: %.cpp
-	$(CXX) $(CXXFLAGS) -c -o $@ $<
+handin.tar: $(FILES)
+	tar cvf handin.tar $(FILES)
 
 clean:
-	/bin/rm -rf *~ *.o $(APP_NAME) *.class
+	(cd code; make clean)
+	(cd examples; make clean)
+	rm -f *~ handin.tar

@@ -1,24 +1,16 @@
-APP_NAME=wireroute
+APP_NAME = wireroute
+OBJS = wireroute.o
 
 CXX = mpic++
-CXXFLAGS = -Wall -Wextra -std=c++20 -I.
+CXXFLAGS = -Wall -Wextra -O3 -std=c++20 -I.
 
-OBJS := wireroute.o
-
-all: CXXFLAGS += -O3
-all: $(APP_NAME)
-
-debug: CXXFLAGS += -O0 -g
-debug: $(APP_NAME)_debug
+default: $(APP_NAME)
 
 $(APP_NAME): $(OBJS)
 	$(CXX) $(CXXFLAGS) -o $@ $(OBJS)
 
-$(APP_NAME)_debug: $(OBJS)
-	$(CXX) $(CXXFLAGS) -o $@ $(OBJS)
-
-%.o: %.cpp %.h
-	$(CXX) $(CXXFLAGS) -c $<
+%.o: %.cpp
+	$(CXX) $(CXXFLAGS) -c -o $@ $<
 
 clean:
-	/bin/rm -rf *~ *.o $(APP_NAME) $(APP_NAME)_debug *.class
+	/bin/rm -rf *~ *.o $(APP_NAME) *.class
